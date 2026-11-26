@@ -1,7 +1,6 @@
 import { CoreServices, useAuth, useCoreServices } from '../../../core';
 import type { AuthenticatedProps } from '../../../core/hooks';
-import { compose } from '../../../lib/core';
-import type { Endpoint } from '../../../lib/core';
+import { compose, type Endpoint } from '../../../lib/core';
 import { useJsonBody, useKoa, useLogging, useServices } from '../../../lib/hooks';
 import { updateUserValidator } from '../schema';
 import { useUserService } from '../service';

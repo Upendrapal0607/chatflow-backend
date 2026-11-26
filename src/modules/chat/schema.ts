@@ -58,10 +58,23 @@ export const createDirectChatValidator = (zod: typeof z) => ({
 });
 
 export const createGroupChatValidator = (zod: typeof z) => ({
-    name: zod.string().trim().min(1).max(120),
-    memberIds: zod.array(zod.string().uuid()).min(2, 'Group chat requires at least 2 members'),
+    name: zod.string().trim().min(1, 'Group name is required').max(120),
+    memberIds: zod.array(zod.string().uuid('Each memberId must be a valid UUID')).min(1, 'At least 1 other member is required'),
+});
+
+export const updateGroupChatValidator = (zod: typeof z) => ({
+    name: zod.string().trim().min(1, 'Group name cannot be empty').max(120),
+});
+
+export const addChatMembersValidator = (zod: typeof z) => ({
+    memberIds: zod.array(zod.string().uuid('Each memberId must be a valid UUID')).min(1, 'Provide at least 1 memberId'),
 });
 
 export const chatIdParamValidator = (zod: typeof z) => ({
     chatId: zod.string().uuid('chatId must be a valid UUID'),
+});
+
+export const chatMemberParamValidator = (zod: typeof z) => ({
+    chatId: zod.string().uuid('chatId must be a valid UUID'),
+    userId: zod.string().uuid('userId must be a valid UUID'),
 });

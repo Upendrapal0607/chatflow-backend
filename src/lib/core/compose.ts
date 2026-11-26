@@ -8,13 +8,15 @@ export function compose<R>(...funcs: AnyFn[]): R {
 
     const reversed = [...funcs].reverse();
     const composed = reversed.reduce((acc, fn) => {
-        const next = fn(acc);
-        Object.keys(acc).forEach((key) => {
-            next[key] = acc[key];
+        const next = fn(acc) as AnyFn;
+        const accProps = acc as unknown as Record<string, unknown>;
+        const nextProps = next as unknown as Record<string, unknown>;
+        Object.keys(accProps).forEach((key) => {
+            nextProps[key] = accProps[key];
         });
         return next;
     });
 
-    (composed as unknown as { endpoint?: AnyFn }).endpoint = funcs[funcs.length - 1];
+    (composed as unknown as Record<string, unknown>).endpoint = funcs[funcs.length - 1];
     return composed as R;
 }

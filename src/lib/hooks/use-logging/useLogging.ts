@@ -1,8 +1,6 @@
 import { tryit } from 'radash';
-import { response as toResponse } from '../../core';
-import type { NextFunc, Props } from '../../core';
-import { useLogger } from '../../../core/logger';
-import type { LoggerService } from '../../../core/logger';
+import { response as toResponse, type NextFunc, type Props } from '../../core';
+import { useLogger, type LoggerService } from '../../../core/logger';
 
 export interface UseLoggingOptions {
     logger?: LoggerService;

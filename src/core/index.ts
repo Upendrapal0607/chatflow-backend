@@ -1,12 +1,9 @@
 import config from './config';
-import { disconnectDatabase, makeDatabase } from './database';
-import type { DatabaseClient } from './database';
-import { disconnectFirestore, makeFirestore } from './firestore';
-import type { FirestoreClient } from './firestore';
+import { disconnectDatabase, makeDatabase, type DatabaseClient } from './database';
+import { disconnectFirestore, makeFirestore, type FirestoreClient } from './firestore';
 import { useAuth } from './hooks';
 import addRoutes from './koa/router';
-import { LogLevel, useLogger } from './logger';
-import type { LoggerService } from './logger';
+import { LogLevel, useLogger, type LoggerService } from './logger';
 import { runPreflight } from './preflight';
 import { comparePassword, hashPassword, signJwt, verifyJwt } from './security';
 import { registerShutdown } from './server';

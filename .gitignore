@@ -4,5 +4,7 @@ dist/
 coverage/
 .env
 .env.local
+creds.json
+*-firebase-adminsdk-*.json
 *.log
 .DS_Store

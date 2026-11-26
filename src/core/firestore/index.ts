@@ -12,6 +12,12 @@ export interface FirestoreClient {
 let firebaseApp: App | null = null;
 let firestoreInstance: Firestore | null = null;
 
+const parseServiceAccountJson = (rawValue: string): ServiceAccount => {
+    const trimmed = rawValue.trim();
+    const jsonString = trimmed.startsWith('{') ? trimmed : Buffer.from(trimmed, 'base64').toString('utf8');
+    return JSON.parse(jsonString) as ServiceAccount;
+};
+
 const loadServiceAccount = (): ServiceAccount | null => {
     if (config.firebase.serviceAccountPath) {
         const resolvedPath = path.resolve(config.firebase.serviceAccountPath);
@@ -20,6 +26,10 @@ const loadServiceAccount = (): ServiceAccount | null => {
         }
         const raw = fs.readFileSync(resolvedPath, 'utf8');
         return JSON.parse(raw) as ServiceAccount;
+    }
+
+    if (config.firebase.serviceAccountJson) {
+        return parseServiceAccountJson(config.firebase.serviceAccountJson);
     }
 
     if (config.firebase.projectId && config.firebase.clientEmail && config.firebase.privateKey) {
@@ -70,6 +80,7 @@ export const getFirebaseApp = (): App => {
 export const getFirestoreDb = (): Firestore => {
     if (!firestoreInstance) {
         firestoreInstance = getFirestore(getFirebaseApp());
+        firestoreInstance.settings({ ignoreUndefinedProperties: true });
     }
     return firestoreInstance;
 };

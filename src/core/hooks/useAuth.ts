@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { InternalServerError, NotAuthenticatedError, NotAuthorizedError } from '../../lib/core';
-import type { NextFunc, Props } from '../../lib/core';
+import { InternalServerError, NotAuthenticatedError, NotAuthorizedError, type NextFunc, type Props } from '../../lib/core';
 import { USER_STATUS_ACTIVE } from '../../modules/user/constants';
 import { toPublicUser } from '../../modules/user/helper';
 import { usersTable } from '../../modules/user/schema';
@@ -14,13 +13,13 @@ export interface AuthContext {
 }
 
 export interface AuthenticatedProps<
-    TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TServices extends Record<string, unknown> = Record<string, unknown>,
+    TArgs extends object = Record<string, unknown>,
+    TServices extends object = Record<string, unknown>,
 > extends Props<TArgs & { currentUser: PublicUser }, TServices, AuthContext> {}
 
 const extractBearerToken = (authorizationHeader: string | string[] | undefined): string => {
     const header = Array.isArray(authorizationHeader) ? authorizationHeader[0] : authorizationHeader;
-    if (!header || !header.startsWith('Bearer ')) {
+    if (!header?.startsWith('Bearer ')) {
         throw new NotAuthenticatedError('Missing or invalid Authorization header', {
             key: 'err.auth.token-missing',
         });
@@ -35,7 +34,7 @@ const extractBearerToken = (authorizationHeader: string | string[] | undefined):
 };
 
 const withJwtAuth = async <
-    TArgs extends Record<string, unknown>,
+    TArgs extends object,
     TServices extends { db?: DatabaseClient },
 >(
     func: NextFunc<AuthenticatedProps<TArgs, TServices>>,
@@ -83,7 +82,7 @@ const withJwtAuth = async <
 
 export const useAuth =
     <
-        TArgs extends Record<string, unknown> = Record<string, unknown>,
+        TArgs extends object = Record<string, unknown>,
         TServices extends { db?: DatabaseClient } = { db?: DatabaseClient },
     >() =>
     (func: NextFunc<AuthenticatedProps<TArgs, TServices>>): NextFunc<Props<TArgs, TServices>> =>

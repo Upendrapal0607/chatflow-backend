@@ -27,6 +27,18 @@ export function createApp(): Koa {
         parameterLimit: 1000,
     });
 
+    // CORS headers for frontend / live deployment access
+    app.use(async (ctx, next) => {
+        ctx.set('Access-Control-Allow-Origin', config.corsOrigin);
+        ctx.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        ctx.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (ctx.method === 'OPTIONS') {
+            ctx.status = 204;
+            return;
+        }
+        await next();
+    });
+
     // Root-level error boundary for errors thrown outside hook-composed handlers (e.g., body parsing)
     app.use(async (ctx, next) => {
         try {

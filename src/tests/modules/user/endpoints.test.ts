@@ -1,4 +1,5 @@
-import request from 'supertest';
+import { IncomingMessage, ServerResponse } from 'http';
+import { Socket } from 'net';
 import { config, hashPassword, signJwt } from '../../../core';
 import type { UserEntity } from '../../../modules/user/types';
 
@@ -78,9 +79,54 @@ jest.mock('../../../modules/user/repository', () => ({
 
 import { createApp } from '../../../app';
 
+/**
+ * Dispatches a request through Koa's middleware stack in-memory without binding a TCP port.
+ */
+async function invokeApp(
+    app: ReturnType<typeof createApp>,
+    opts: {
+        method: string;
+        url: string;
+        body?: Record<string, unknown>;
+        headers?: Record<string, string>;
+    },
+): Promise<{ status: number; body: any }> {
+    const socket = new Socket();
+    const req = new IncomingMessage(socket);
+    req.method = opts.method;
+    req.url = opts.url;
+    req.headers = {
+        'content-type': 'application/json',
+        ...(opts.headers ?? {}),
+    };
+
+    if (opts.body !== undefined) {
+        const raw = Buffer.from(JSON.stringify(opts.body));
+        req.headers['content-length'] = String(raw.length);
+        req.push(raw);
+    }
+    req.push(null);
+
+    const res = new ServerResponse(req);
+    const ctx = app.createContext(req, res);
+    if (opts.body !== undefined) {
+        (ctx.request as any).body = opts.body;
+    }
+
+    const runStack = (idx: number): Promise<void> => {
+        const fn = app.middleware[idx];
+        if (!fn) {
+            return Promise.resolve();
+        }
+        return Promise.resolve(fn(ctx, () => runStack(idx + 1)));
+    };
+
+    await runStack(0);
+    return { status: ctx.status, body: ctx.body };
+}
+
 describe('User & Health HTTP endpoints', () => {
     const app = createApp();
-    const callback = app.callback();
 
     beforeAll(() => {
         config.jwt.secret = 'test-jwt-secret-key-at-least-32-chars-long';
@@ -92,7 +138,8 @@ describe('User & Health HTTP endpoints', () => {
     });
 
     it('GET /health/status returns 200 with service status', async () => {
-        const res = await request(callback).get('/health/status').expect(200);
+        const res = await invokeApp(app, { method: 'GET', url: '/health/status' });
+        expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
         expect(res.body.data.status).toBe('ok');
         expect(res.body.data.services).toEqual({
@@ -102,16 +149,18 @@ describe('User & Health HTTP endpoints', () => {
     });
 
     it('POST /user/register creates user, returns 201 + JWT token', async () => {
-        const res = await request(callback)
-            .post('/user/register')
-            .send({
+        const res = await invokeApp(app, {
+            method: 'POST',
+            url: '/user/register',
+            body: {
                 name: 'Alice Smith',
                 email: 'alice@example.com',
                 username: 'alice',
                 password: 'Password123!',
-            })
-            .expect(201);
+            },
+        });
 
+        expect(res.status).toBe(201);
         expect(res.body.statusCode).toBe(201);
         expect(res.body.success).toBe(true);
         expect(res.body.data.token).toBeTruthy();
@@ -120,11 +169,13 @@ describe('User & Health HTTP endpoints', () => {
     });
 
     it('POST /user/register returns 400 validation error on invalid payload', async () => {
-        const res = await request(callback)
-            .post('/user/register')
-            .send({ name: 'A', email: 'bad-email', password: '123' })
-            .expect(400);
+        const res = await invokeApp(app, {
+            method: 'POST',
+            url: '/user/register',
+            body: { name: 'A', email: 'bad-email', password: '123' },
+        });
 
+        expect(res.status).toBe(400);
         expect(res.body.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
         expect(res.body.error.key).toBe('err.json-body.failed');
@@ -145,17 +196,20 @@ describe('User & Health HTTP endpoints', () => {
             updatedAt: new Date(),
         });
 
-        const res = await request(callback)
-            .post('/user/login')
-            .send({ email: 'alice@example.com', password: 'Password123!' })
-            .expect(200);
+        const res = await invokeApp(app, {
+            method: 'POST',
+            url: '/user/login',
+            body: { email: 'alice@example.com', password: 'Password123!' },
+        });
 
+        expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
         expect(res.body.data.token).toBeTruthy();
     });
 
     it('GET /user/me enforces JWT authentication and returns current user', async () => {
-        await request(callback).get('/user/me').expect(401);
+        const unauthRes = await invokeApp(app, { method: 'GET', url: '/user/me' });
+        expect(unauthRes.status).toBe(401);
 
         mockUsers.set('11111111-1111-4111-8111-111111111111', {
             id: '11111111-1111-4111-8111-111111111111',
@@ -175,11 +229,13 @@ describe('User & Health HTTP endpoints', () => {
             email: 'alice@example.com',
         });
 
-        const res = await request(callback)
-            .get('/user/me')
-            .set('Authorization', `Bearer ${token}`)
-            .expect(200);
+        const res = await invokeApp(app, {
+            method: 'GET',
+            url: '/user/me',
+            headers: { authorization: `Bearer ${token}` },
+        });
 
+        expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
         expect(res.body.data.user.email).toBe('alice@example.com');
     });
@@ -203,16 +259,19 @@ describe('User & Health HTTP endpoints', () => {
             email: 'alice@example.com',
         });
 
-        await request(callback)
-            .get('/user/not-a-uuid')
-            .set('Authorization', `Bearer ${token}`)
-            .expect(400);
+        const badParamRes = await invokeApp(app, {
+            method: 'GET',
+            url: '/user/not-a-uuid',
+            headers: { authorization: `Bearer ${token}` },
+        });
+        expect(badParamRes.status).toBe(400);
 
-        const res = await request(callback)
-            .get('/user/11111111-1111-4111-8111-111111111111')
-            .set('Authorization', `Bearer ${token}`)
-            .expect(200);
-
-        expect(res.body.data.user.id).toBe('11111111-1111-4111-8111-111111111111');
+        const okRes = await invokeApp(app, {
+            method: 'GET',
+            url: '/user/11111111-1111-4111-8111-111111111111',
+            headers: { authorization: `Bearer ${token}` },
+        });
+        expect(okRes.status).toBe(200);
+        expect(okRes.body.data.user.id).toBe('11111111-1111-4111-8111-111111111111');
     });
 });

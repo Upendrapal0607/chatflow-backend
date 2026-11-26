@@ -20,6 +20,7 @@ export interface AppConfig {
     port: number;
     logLevel: string;
     skipDbPreflight: boolean;
+    corsOrigin: string;
     database: {
         url: string;
         poolMax: number;
@@ -36,6 +37,7 @@ export interface AppConfig {
     firebase: {
         projectId?: string;
         serviceAccountPath?: string;
+        serviceAccountJson?: string;
         clientEmail?: string;
         privateKey?: string;
         emulatorHost?: string;
@@ -47,11 +49,12 @@ const config: AppConfig = {
     port: getIntEnv('PORT', 8000),
     logLevel: getEnv('LOG_LEVEL', 'info') ?? 'info',
     skipDbPreflight: getEnv('SKIP_DB_PREFLIGHT') === 'true',
+    corsOrigin: getEnv('CORS_ORIGIN', '*') ?? '*',
     database: {
         url: getEnv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/chatflow') ?? '',
         poolMax: getIntEnv('PG_POOL_MAX', 10),
         idleTimeoutMs: getIntEnv('PG_IDLE_TIMEOUT_MS', 30000),
-        connectionTimeoutMs: getIntEnv('PG_CONNECTION_TIMEOUT_MS', 5000),
+        connectionTimeoutMs: getIntEnv('PG_CONNECTION_TIMEOUT_MS', 10000),
     },
     jwt: {
         secret: getEnv('JWT_SECRET', '') ?? '',
@@ -63,6 +66,7 @@ const config: AppConfig = {
     firebase: {
         projectId: getEnv('FIREBASE_PROJECT_ID'),
         serviceAccountPath: getEnv('FIREBASE_SERVICE_ACCOUNT_PATH'),
+        serviceAccountJson: getEnv('FIREBASE_SERVICE_ACCOUNT_JSON'),
         clientEmail: getEnv('FIREBASE_CLIENT_EMAIL'),
         privateKey: getEnv('FIREBASE_PRIVATE_KEY')?.replace(/\\n/g, '\n'),
         emulatorHost: getEnv('FIRESTORE_EMULATOR_HOST'),

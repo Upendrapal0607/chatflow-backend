@@ -18,6 +18,18 @@ function validateConfig(): void {
         errors.push('DATABASE_URL is required');
     }
 
+    if (
+        config.env === 'production' &&
+        !config.firebase.emulatorHost &&
+        !config.firebase.serviceAccountPath &&
+        !config.firebase.serviceAccountJson &&
+        !(config.firebase.projectId && config.firebase.clientEmail && config.firebase.privateKey)
+    ) {
+        errors.push(
+            'Firebase credentials are required in production (set FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY, FIREBASE_SERVICE_ACCOUNT_JSON, or FIREBASE_SERVICE_ACCOUNT_PATH)',
+        );
+    }
+
     if (errors.length > 0) {
         throw new Error(`[Preflight] Config validation failed:\n${errors.map((e) => `  - ${e}`).join('\n')}`);
     }
@@ -44,7 +56,7 @@ async function checkConnectivity(): Promise<void> {
         { name: 'Firestore', fn: () => firestore.ping() },
     ];
 
-    const results = await Promise.allSettled(checks.map((c) => withTimeout(c.fn(), 5000, c.name)));
+    const results = await Promise.allSettled(checks.map((c) => withTimeout(c.fn(), 10000, c.name)));
 
     const failures: string[] = [];
     results.forEach((res, idx) => {

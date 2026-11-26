@@ -2,6 +2,7 @@ import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool, QueryResult, QueryResultRow } from 'pg';
 import config from '../config';
 import { schema, DatabaseSchema } from '../../db/schema';
+import { useLogger } from '../logger';
 
 export type DbOrm = NodePgDatabase<DatabaseSchema>;
 
@@ -11,6 +12,8 @@ export interface DatabaseClient {
     query: <T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<QueryResult<T>>;
     ping: () => Promise<boolean>;
 }
+
+const logger = useLogger({ component: 'database' });
 
 let sharedPool: Pool | null = null;
 let sharedOrm: DbOrm | null = null;
@@ -22,6 +25,12 @@ export const getPgPool = (): Pool => {
             max: config.database.poolMax,
             idleTimeoutMillis: config.database.idleTimeoutMs,
             connectionTimeoutMillis: config.database.connectionTimeoutMs,
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 10000,
+        });
+
+        sharedPool.on('error', (err) => {
+            logger.captureError(err, { source: 'pg.Pool.idle' });
         });
     }
     return sharedPool;

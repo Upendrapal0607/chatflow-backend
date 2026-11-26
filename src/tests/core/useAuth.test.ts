@@ -1,8 +1,8 @@
 process.env.JWT_SECRET = 'test-jwt-secret-key-at-least-32-chars-long';
 
-import { config, signJwt } from '../../../core';
-import { useAuth } from '../../../core/hooks';
-import { NotAuthenticatedError, NotAuthorizedError, props } from '../../../lib/core';
+import { config, signJwt } from '../../core';
+import { useAuth } from '../../core/hooks';
+import { NotAuthenticatedError, NotAuthorizedError, props } from '../../lib/core';
 
 const makeMockDb = (userRow: Record<string, unknown> | undefined) => ({
     orm: {

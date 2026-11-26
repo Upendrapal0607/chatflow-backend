@@ -18,4 +18,7 @@ export const MESSAGE_ERROR_KEYS = {
     NOT_FOUND: 'err.message.not-found',
     SEND_FAILED: 'err.message.send-failed',
     FORBIDDEN: 'err.message.forbidden',
+    ALREADY_DELETED: 'err.message.already-deleted',
+    SENDER_MISMATCH: 'err.message.sender-mismatch',
+    USER_MISMATCH: 'err.message.user-mismatch',
 } as const;

@@ -1,7 +1,6 @@
 import type Koa from 'koa';
 import { isFunction, tryit } from 'radash';
-import { AppError, props, response } from '../../core';
-import type { NextFunc, Props, Request, Response } from '../../core';
+import { AppError, props, response, type NextFunc, type Props, type Request, type Response } from '../../core';
 
 export type KoaFramework = {
     ctx: Koa.Context;

@@ -1,7 +1,6 @@
 import { isFunction, tryit } from 'radash';
 import zod, { ZodError, ZodObject, ZodRawShape } from 'zod';
-import { BadRequestError } from '../../core';
-import type { NextFunc, Props } from '../../core';
+import { BadRequestError, type NextFunc, type Props } from '../../core';
 
 const isZodError = (err: unknown): err is ZodError =>
     typeof err === 'object' && err !== null && Array.isArray((err as ZodError).issues);

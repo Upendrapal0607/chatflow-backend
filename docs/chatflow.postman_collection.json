@@ -1,0 +1,270 @@
+{
+  "info": {
+    "name": "ChatFlow Backend API",
+    "description": "Complete API collection for ChatFlow Backend (PostgreSQL + Firebase Firestore + JWT Auth). Import into Postman / Insomnia / Thunder Client.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "tokenA", "value": "" },
+    { "key": "tokenB", "value": "" },
+    { "key": "userAId", "value": "" },
+    { "key": "userBId", "value": "" },
+    { "key": "userCId", "value": "" },
+    { "key": "chatId", "value": "" },
+    { "key": "groupChatId", "value": "" },
+    { "key": "messageId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User & Auth",
+      "item": [
+        {
+          "name": "Register User A",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Smith\",\n  \"email\": \"alice@example.com\",\n  \"username\": \"alice\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{baseUrl}}/user/register"
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{baseUrl}}/user/login"
+          }
+        },
+        {
+          "name": "Get Current User (Me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/user/me"
+          }
+        },
+        {
+          "name": "Update Current User (Me)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Updated\"\n}"
+            },
+            "url": "{{baseUrl}}/user/me"
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/user/{{userAId}}"
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/users?page=1&limit=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Core Chat & Messaging",
+      "item": [
+        {
+          "name": "1. Create or Get 1:1 Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userAId\": \"{{userAId}}\",\n  \"userBId\": \"{{userBId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/chat/create"
+          }
+        },
+        {
+          "name": "2. Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderId\": \"{{userAId}}\",\n  \"text\": \"Hello Bob!\"\n}"
+            },
+            "url": "{{baseUrl}}/chat/{{chatId}}/message/send"
+          }
+        },
+        {
+          "name": "3. Get Messages (Ordered)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }],
+            "url": "{{baseUrl}}/chat/{{chatId}}/messages?limit=50"
+          }
+        },
+        {
+          "name": "4. Mark Message Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenB}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userBId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/chat/{{chatId}}/message/{{messageId}}/read"
+          }
+        },
+        {
+          "name": "5. Update Last Seen",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenB}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userBId}}\",\n  \"messageId\": \"{{messageId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/chat/{{chatId}}/lastseen"
+          }
+        },
+        {
+          "name": "6. List User Chats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/user/{{userAId}}/chats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bonus (Group Chat & Message Edit/Delete)",
+      "item": [
+        {
+          "name": "Create Group Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Engineering Team\",\n  \"memberIds\": [\"{{userBId}}\", \"{{userCId}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/chat/group/create"
+          }
+        },
+        {
+          "name": "Get Chat Details",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/chat/{{groupChatId}}"
+          }
+        },
+        {
+          "name": "Rename Group Chat",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Core Engineering\"\n}"
+            },
+            "url": "{{baseUrl}}/chat/{{groupChatId}}"
+          }
+        },
+        {
+          "name": "Add Group Members",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberIds\": [\"{{userCId}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/chat/{{groupChatId}}/members"
+          }
+        },
+        {
+          "name": "Remove Group Member",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/chat/{{groupChatId}}/members/{{userCId}}"
+          }
+        },
+        {
+          "name": "Edit Message",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenA}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Hello Bob (edited)!\"\n}"
+            },
+            "url": "{{baseUrl}}/chat/{{chatId}}/message/{{messageId}}"
+          }
+        },
+        {
+          "name": "Delete Message (Soft Delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/chat/{{chatId}}/message/{{messageId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

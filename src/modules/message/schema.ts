@@ -61,9 +61,14 @@ export const sendMessageValidator = (zod: typeof z) => ({
     type: zod.enum(MESSAGE_TYPES).optional().default('text'),
 });
 
+export const editMessageValidator = (zod: typeof z) => ({
+    text: zod.string().trim().min(1, 'Message text cannot be empty').max(4000),
+});
+
 export const getMessagesQueryValidator = (zod: typeof z) => ({
     limit: zod.coerce.number().int().min(1).max(MAX_MESSAGES_LIMIT).default(DEFAULT_MESSAGES_LIMIT),
-    before: zod.string().optional(),
+    before: zod.string().trim().min(1).optional(),
+    order: zod.enum(['asc', 'desc']).optional().default('asc'),
 });
 
 export const markMessageReadValidator = (zod: typeof z) => ({
@@ -72,10 +77,10 @@ export const markMessageReadValidator = (zod: typeof z) => ({
 
 export const updateLastSeenValidator = (zod: typeof z) => ({
     userId: zod.string().uuid('userId must be a valid UUID'),
-    messageId: zod.string().min(1, 'messageId is required'),
+    messageId: zod.string().trim().min(1, 'messageId is required'),
 });
 
 export const messageIdParamValidator = (zod: typeof z) => ({
     chatId: zod.string().uuid('chatId must be a valid UUID'),
-    messageId: zod.string().min(1, 'messageId is required'),
+    messageId: zod.string().trim().min(1, 'messageId is required'),
 });

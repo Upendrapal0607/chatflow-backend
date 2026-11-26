@@ -57,11 +57,11 @@ export type Response = {
 };
 
 export type Props<
-    TArgs extends Record<string, unknown> = Record<string, unknown>,
-    TServices extends Record<string, unknown> = Record<string, unknown>,
-    TAuth extends Record<string, unknown> = Record<string, unknown>,
+    TArgs extends object = Record<string, unknown>,
+    TServices extends object = Record<string, unknown>,
+    TAuth extends object = Record<string, unknown>,
     TRequest extends Request = Request,
-    TFramework extends Record<string, unknown> = Record<string, unknown>,
+    TFramework extends object = Record<string, unknown>,
 > = {
     auth: TAuth;
     args: TArgs;
