@@ -1,0 +1,98 @@
+const tseslint = require('@typescript-eslint/eslint-plugin');
+const tsparser = require('@typescript-eslint/parser');
+
+module.exports = [
+    {
+        files: ['src/**/*.ts', 'src/tests/**/*.ts'],
+        languageOptions: {
+            parser: tsparser,
+            parserOptions: {
+                ecmaVersion: 2022,
+                sourceType: 'module',
+                project: './tsconfig.eslint.json',
+            },
+            globals: {
+                console: 'readonly',
+                process: 'readonly',
+                Buffer: 'readonly',
+                __dirname: 'readonly',
+                __filename: 'readonly',
+                module: 'readonly',
+                require: 'readonly',
+                exports: 'readonly',
+                global: 'readonly',
+                setTimeout: 'readonly',
+                clearTimeout: 'readonly',
+                setInterval: 'readonly',
+                clearInterval: 'readonly',
+            },
+        },
+        plugins: {
+            '@typescript-eslint': tseslint,
+        },
+        rules: {
+            quotes: ['error', 'single'],
+            semi: ['error', 'always'],
+            'comma-dangle': ['error', 'only-multiline'],
+            'no-trailing-spaces': 'error',
+            'eol-last': ['error', 'always'],
+            'no-multiple-empty-lines': ['error', { max: 2, maxEOF: 1 }],
+            'object-curly-spacing': ['error', 'always'],
+            'array-bracket-spacing': ['error', 'never'],
+            'comma-spacing': ['error', { before: false, after: true }],
+            'key-spacing': ['error', { beforeColon: false, afterColon: true }],
+            'space-before-blocks': 'error',
+            'space-before-function-paren': [
+                'error',
+                {
+                    anonymous: 'always',
+                    named: 'never',
+                    asyncArrow: 'always',
+                },
+            ],
+            'space-in-parens': ['error', 'never'],
+            'space-infix-ops': 'error',
+            'keyword-spacing': 'error',
+            'brace-style': ['error', '1tbs', { allowSingleLine: true }],
+
+            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+            '@typescript-eslint/explicit-function-return-type': 'off',
+            '@typescript-eslint/explicit-module-boundary-types': 'off',
+            '@typescript-eslint/no-non-null-assertion': 'warn',
+            '@typescript-eslint/prefer-optional-chain': 'warn',
+
+            'no-console': 'warn',
+            'no-debugger': 'error',
+            'no-alert': 'error',
+            'no-var': 'error',
+            'prefer-const': 'error',
+            'no-unused-vars': 'off',
+            'no-undef': 'off',
+            eqeqeq: ['error', 'always'],
+            curly: ['error', 'all'],
+            'no-eval': 'error',
+            'no-implied-eval': 'error',
+            'no-new-func': 'error',
+            'no-self-compare': 'error',
+            'no-sequences': 'error',
+            'no-throw-literal': 'error',
+            'no-void': 'error',
+            radix: 'error',
+            yoda: ['error', 'never'],
+            'no-duplicate-imports': 'error',
+            'require-await': 'error',
+        },
+    },
+    {
+        files: ['**/*.test.ts', '**/*.spec.ts', 'src/tests/**/*.ts'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+            'no-console': 'off',
+            'require-await': 'off',
+        },
+    },
+    {
+        ignores: ['build/**/*', 'dist/**/*', 'node_modules/**/*', '*.js', '.env*', 'coverage/**/*'],
+    },
+];
