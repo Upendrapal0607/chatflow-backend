@@ -308,12 +308,6 @@ curl http://localhost:8000/health/status
 | `npm test` | Run the Jest test suite |
 | `npm run validate` | Run lint, type-checking, and tests |
 
-Before committing or deploying, run:
-
-```bash
-npm run validate
-```
-
 ## Deployment
 
 Set `NODE_ENV=production` and provide `JWT_SECRET`, `DATABASE_URL`, and the selected Firebase credentials through the hosting environment. Do not commit `.env`, Firebase credential files, or private keys.
