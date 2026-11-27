@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: f92e7e8a-bf2f-49b3-9d90-32aabe099ece
+
+localResources:
+  collections:
+    - ../docs/chatflow.postman_collection.json

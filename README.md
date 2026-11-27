@@ -1,138 +1,104 @@
 # ChatFlow Backend
 
-A production-ready chat backend built with **Node.js (>= 22.16)**, **strict TypeScript**, **Koa**, **PostgreSQL (Drizzle ORM + `pg`)**, and **Firebase Firestore (`firebase-admin`)**.
+ChatFlow is a REST API for user accounts, direct and group chats, and chat messages. It is built with Node.js, TypeScript, Koa, PostgreSQL, and Firebase Firestore.
 
-It combines **PostgreSQL** for relational integrity (users, 1:1/group chats, memberships) with **Firebase Firestore** for high-throughput chat messaging (time-ordered messages, per-message read receipts, last-seen tracking, message edit & soft-delete).
+PostgreSQL is the source of truth for users and chat membership. Firestore stores messages and real-time chat state. Keeping these responsibilities separate makes relational authorization checks straightforward while allowing message reads and writes to scale independently.
 
----
+### Architecture and PostgreSQL Tables ([project_guide.md](./project_guide.md))
+
+## Features
+
+- JWT-based authentication and bcrypt password hashing
+- Direct and group chat creation
+- Chat membership and role-based authorization
+- Message send, edit, soft-delete, and ordered retrieval
+- Read receipts and per-user last-seen tracking
+- Strict request validation with Zod
+- PostgreSQL and Firestore health checks
+- Jest tests for services and HTTP endpoints
 
 ## Tech Stack
 
-- **Runtime & Language:** Node.js `>=22.16.0`, TypeScript `5.9` (`strict: true`, `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess`)
-- **HTTP Framework:** Koa `3`, `@koa/router`, `koa-body`, `koa-qs`
-- **Validation:** Zod (`useJsonBody`, `usePathParams`, `useQueryString`, `useHeaders`)
-- **Relational Database:** PostgreSQL (Neon-ready) via `pg` + Drizzle ORM (`drizzle-orm` / `drizzle-kit`)
-- **Document / Real-time Store:** Firebase Firestore via `firebase-admin`
-- **Auth & Security:** JWT (`jsonwebtoken`, `HS256`) + `bcrypt` password hashing
-- **Testing & Quality:** Jest (`ts-jest`), ESLint (`--max-warnings 0`), Prettier
+- Node.js 22+
+- TypeScript with strict compiler settings
+- Koa 3 and `@koa/router`
+- PostgreSQL with `pg` and Drizzle ORM
+- Firebase Admin SDK and Firestore
+- Zod for request validation
+- JWT and bcrypt
+- Jest, Supertest, ESLint, and Prettier
 
----
-
-## Working Flow & Request Lifecycle
-
-### 1. Application Startup (`src/app.ts` & `src/core/preflight.ts`)
-1. Loads environment variables (`dotenv/config`).
-2. `runPreflight()` validates required config (`JWT_SECRET`, `DATABASE_URL`, and Firebase credentials in `production`) and verifies connectivity to both **PostgreSQL** and **Firestore** (skippable locally with `SKIP_DB_PREFLIGHT=true`).
-3. `createApp()` configures `koa-qs`, CORS headers (`CORS_ORIGIN`), a root-level error boundary, `koa-body`, and registers all module routes from `src/modules/endpoints.ts`.
-4. Registers graceful shutdown (`SIGTERM` / `SIGINT`) to close the HTTP server, PostgreSQL pool, and Firestore client cleanly.
-
-### 2. Endpoint Hook Pipeline (`compose(...)`)
-Every endpoint is composed from reusable functional hooks:
+## Architecture
 
 ```text
-HTTP Request
-  │
-  ▼
-useKoa()                 ──▶ Normalizes Koa ctx into typed Props; catches errors & writes HTTP response
-  │
-  ▼
-useServices(...)         ──▶ Injects core services (db, firestore, logger) & domain services
-  │
-  ▼
-useLogging()             ──▶ Logs "[METHOD] /path at ISO -> STATUS in Xms"
-  │
-  ▼
-useAuth()                ──▶ (Protected routes) Verifies Bearer JWT, loads active user from PostgreSQL
-  │
-  ▼
-usePathParams /          ──▶ Validates params, query string, and JSON body via Zod
-useQueryString /             (throws BadRequestError 400 with field-level details on failure)
-useJsonBody
-  │
-  ▼
-Endpoint Handler         ──▶ Calls module service -> repository (PostgreSQL / Firestore)
-  │
-  ▼
-Response Formatter       ──▶ { statusCode, success: true, data, pagination? }
-                             or AppError -> { statusCode, success: false, error: { message, key, details? } }
+Client
+  |
+  v
+Koa HTTP server
+  |
+  v
+Hooks: authentication -> validation -> logging -> handler
+  |
+  +--> PostgreSQL: users, chats, chat_members
+  |
+  `--> Firestore: messages, readReceipts, lastSeen
 ```
 
-### 3. Hybrid Database Workflow (PostgreSQL + Firestore)
-- **PostgreSQL** owns **identity, chats, and membership authorization**:
-  - Every chat/message API first verifies the caller's JWT (`useAuth`) and checks membership in `chat_members` before reading or writing Firestore.
-  - 1:1 chats are atomically deduplicated using a canonical `direct_key` (`min(userAId, userBId):max(userAId, userBId)`).
-- **Firebase Firestore** owns **messages, read receipts, and last-seen state**:
-  - `POST /chat/:chatId/message/send` writes the message document to Firestore and updates `chats.updated_at` in PostgreSQL so chat lists stay sorted by recent activity.
-  - `POST /chat/:chatId/message/:messageId/read` executes an atomic Firestore batch write updating both `readBy.<userId>` on the message and the `readReceipts/{userId}` subcollection document.
+An authenticated request is resolved through reusable endpoint hooks. Protected endpoints verify the JWT and load the current user from PostgreSQL. Chat operations also verify membership before reading or writing Firestore data.
 
----
+For the request flow, data ownership, and database layout, see [project_guide.md](./project_guide.md).
 
-## Project Structure
+## Project Layout
 
 ```text
-chatflow-backend/
-├── database/
-│   └── schema.sql                         # PostgreSQL DDL (users, chats, chat_members + indexes)
-├── src/
-│   ├── app.ts                             # Koa app factory, CORS, root error boundary, bootstrap
-│   ├── db/
-│   │   └── schema.ts                      # Combined Drizzle ORM schema & relations
-│   ├── types/
-│   │   ├── koa-qs.d.ts                    # Type declarations for koa-qs
-│   │   └── koa-router.d.ts                # Type declarations for @koa/router
-│   ├── core/
-│   │   ├── config.ts                      # Typed environment configuration
-│   │   ├── index.ts                       # Core exports & useCoreServices()
-│   │   ├── preflight.ts                   # Env & DB/Firestore connectivity checks
-│   │   ├── database/index.ts              # pg.Pool (keepAlive + error listener) & Drizzle ORM
-│   │   ├── firestore/index.ts             # Firebase Admin initialization (env vars, JSON, file, emulator)
-│   │   ├── hooks/useAuth.ts               # JWT Bearer authentication hook
-│   │   ├── koa/router.ts                  # Endpoint registration helper
-│   │   ├── logger/index.ts                # Structured logger
-│   │   ├── security/index.ts              # JWT sign/verify + bcrypt hashing
-│   │   └── server/index.ts                # Graceful shutdown handler
-│   ├── lib/
-│   │   ├── core/                          # AppError classes, response/res helpers, compose, hook, props, types
-│   │   └── hooks/                         # useKoa, useServices, useLogging, useJsonBody, usePathParams, useQueryString, useHeaders
-│   ├── modules/
-│   │   ├── endpoints.ts                   # Central route registry
-│   │   ├── types.ts                       # Shared module arg/service types
-│   │   ├── health/                        # GET /health/status
-│   │   ├── user/                          # Register, login, profile, user listing/lookup (PostgreSQL)
-│   │   ├── chat/                          # 1:1 chats, group chats, membership, user chat list (PostgreSQL)
-│   │   └── message/                       # Send, ordered fetch, read receipts, last seen, edit/delete (Firestore)
-│   └── tests/                             # Jest unit tests & in-memory Koa endpoint tests
-├── .env.sample
-├── drizzle.config.ts
-├── eslint.config.js
-├── jest.config.js
-├── package.json
-└── tsconfig.json
+src/
+  app.ts                  Application setup and route registration
+  core/                   Configuration, database, Firestore, auth, and server helpers
+  lib/                   Shared hooks, errors, types, and response utilities
+  modules/
+    user/                 Registration, login, and user APIs
+    chat/                 Direct and group chat APIs
+    message/              Message, read receipt, and last-seen APIs
+  tests/                  Jest test suite
+database/
+  schema.sql              PostgreSQL schema
+docs/
+  api-reference.json      API examples and schema
+  chatflow.postman_collection.json
 ```
 
----
+## Data Model
 
-## Database Design
+### PostgreSQL
 
-### PostgreSQL Tables ([database/schema.sql](database/schema.sql))
-| Table | Purpose | Key Columns & Constraints |
-| :--- | :--- | :--- |
-| `users` | User accounts & auth | `id` (UUID PK), `name`, `email` (UNIQUE), `username` (UNIQUE), `password_hash`, `avatar_url`, `status` (`active` \| `inactive` \| `suspended`), `last_active_at`, `created_at`, `updated_at` |
-| `chats` | 1:1 direct & group chats | `id` (UUID PK), `type` (`direct` \| `group`), `direct_key` (UNIQUE for 1:1 deduplication), `name` (group name), `created_by` (FK → `users.id`), `created_at`, `updated_at` |
-| `chat_members` | Chat membership & roles | `id` (UUID PK), `chat_id` (FK → `chats.id` CASCADE), `user_id` (FK → `users.id` CASCADE), `role` (`member` \| `admin`), `joined_at`, `UNIQUE(chat_id, user_id)` |
+| Table | Purpose |
+| --- | --- |
+| `users` | Accounts and authentication |
+| `chats` | Direct and group chat records |
+| `chat_members` | Chat membership and admin/member roles |
 
-### Firebase Firestore Collections ([src/modules/message/schema.ts](src/modules/message/schema.ts))
-| Path | Document Fields |
-| :--- | :--- |
-| `chats/{chatId}/messages/{messageId}` | `id`, `chatId`, `senderId`, `text`, `type` (`text` \| `system`), `readBy` (`Record<userId, Timestamp>`), `isEdited`, `editedAt`, `isDeleted`, `deletedAt`, `createdAt`, `updatedAt` |
-| `chats/{chatId}/messages/{messageId}/readReceipts/{userId}` | `userId`, `messageId`, `chatId`, `readAt` |
-| `chats/{chatId}/lastSeen/{userId}` | `userId`, `chatId`, `messageId`, `updatedAt` |
+The schema is in [database/schema.sql](./database/schema.sql). A direct chat uses a unique `direct_key` to prevent duplicate conversations between the same pair of users.
 
----
+### Firestore
 
-## Standard Response & Error Format
+| Collection path | Purpose |
+| --- | --- |
+| `chats/{chatId}/messages/{messageId}` | Chat messages |
+| `.../readReceipts/{userId}` | Per-message read state |
+| `chats/{chatId}/lastSeen/{userId}` | Each user's latest seen message |
 
-**Success (`200` / `201`):**
+The Firestore document shape is maintained in [src/modules/message/schema.ts](./src/modules/message/schema.ts).
+
+## API
+
+All protected endpoints require:
+
+```http
+Authorization: Bearer <jwt_token>
+```
+
+Successful responses use this shape:
+
 ```json
 {
   "statusCode": 200,
@@ -141,95 +107,223 @@ chatflow-backend/
 }
 ```
 
-**Error (`400` / `401` / `403` / `404` / `409` / `500`):**
+Errors use a consistent JSON structure:
+
 ```json
 {
   "statusCode": 400,
   "success": false,
   "error": {
-    "message": "JSON body validation failed: email: invalid email",
+    "message": "JSON body validation failed",
     "key": "err.json-body.failed",
-    "details": [
-      { "path": "email", "message": "Invalid email", "code": "invalid_string" }
-    ]
+    "details": []
   }
 }
 ```
 
----
+### Health
 
-## API Reference
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health/status` | Checks PostgreSQL and Firestore connectivity |
 
-> Protected routes require header: `Authorization: Bearer <jwt_token>`
+### Users
 
-### 1. Health
-- **`GET /health/status`** *(Public)* — Pings PostgreSQL and Firestore; returns `200` (`status: "ok"`) when both are connected or `503` (`status: "degraded"`) if either is unreachable.
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/user/register` | Register a user |
+| `POST` | `/user/login` | Log in and receive a JWT |
+| `GET` | `/user/me` | Get the authenticated user |
+| `PATCH` | `/user/me` | Update the authenticated user's profile |
+| `GET` | `/user/:userId` | Get a user by ID |
+| `GET` | `/users` | Search or list users |
 
-### 2. Users & Authentication
-| Method & Path | Auth | Input | Output (`data`) |
-| :--- | :--- | :--- | :--- |
-| `POST /user/register` | Public | `{ name, email, password, username?, avatarUrl? }` | `201` `{ token, user }` |
-| `POST /user/login` | Public | `{ email, password }` | `200` `{ token, user }` |
-| `GET /user/me` | Bearer JWT | — | `200` `{ user }` |
-| `PATCH /user/me` | Bearer JWT | `{ name?, username?, avatarUrl? }` | `200` `{ user }` |
-| `GET /user/:userId` | Bearer JWT | Path: `userId` (UUID) | `200` `{ user }` |
-| `GET /users` | Bearer JWT | Query: `search?`, `status?`, `page?`, `limit?` | `200` `{ users }` + `pagination` |
+### Chats
 
-### 3. Core Chat & Messaging APIs
-| # | Method & Path | Auth | Input | Output (`data`) |
-| :-: | :--- | :--- | :--- | :--- |
-| 1 | `POST /chat/create` | Bearer JWT | Body: `{ userAId, userBId }` | `201`/`200` `{ chatId, created, chat }` |
-| 2 | `POST /chat/:chatId/message/send` | Bearer JWT | Path: `chatId`; Body: `{ senderId, text, type? }` | `201` `{ message }` |
-| 3 | `GET /chat/:chatId/messages` | Bearer JWT | Path: `chatId`; Query: `limit=50`, `before?`, `order=asc\|desc` | `200` `{ messages, lastSeen }` |
-| 4 | `POST /chat/:chatId/message/:messageId/read` | Bearer JWT | Path: `chatId, messageId`; Body: `{ userId }` | `200` `{ receipt }` |
-| 5 | `POST /chat/:chatId/lastseen` | Bearer JWT | Path: `chatId`; Body: `{ userId, messageId }` | `200` `{ lastSeen }` |
-| 6 | `GET /user/:userId/chats` | Bearer JWT | Path: `userId` | `200` `{ chats }` (includes `memberIds` & `members`) |
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/chat/create` | Create or return a direct chat |
+| `POST` | `/chat/group/create` | Create a group chat |
+| `GET` | `/chat/:chatId` | Get chat details |
+| `PATCH` | `/chat/:chatId` | Update a group chat name |
+| `GET` | `/user/:userId/chats` | List a user's chats |
+| `POST` | `/chat/:chatId/members` | Add members to a group chat |
+| `DELETE` | `/chat/:chatId/members/:userId` | Remove a member |
 
-### 4. Bonus APIs (Group Chats & Message Edit/Delete)
-| Method & Path | Auth & Role | Input | Output (`data`) |
-| :--- | :--- | :--- | :--- |
-| `POST /chat/group/create` | Bearer JWT | Body: `{ name, memberIds }` (creator added as `admin`) | `201` `{ chatId, chat }` |
-| `GET /chat/:chatId` | Bearer JWT (Member) | Path: `chatId` | `200` `{ chat }` |
-| `PATCH /chat/:chatId` | Bearer JWT (Admin) | Path: `chatId`; Body: `{ name }` | `200` `{ chat }` |
-| `POST /chat/:chatId/members` | Bearer JWT (Admin) | Path: `chatId`; Body: `{ memberIds }` | `200` `{ chat }` |
-| `DELETE /chat/:chatId/members/:userId` | Bearer JWT (Admin or Self) | Path: `chatId, userId` | `200` `{ chat }` |
-| `PATCH /chat/:chatId/message/:messageId` | Bearer JWT (Sender) | Path: `chatId, messageId`; Body: `{ text }` | `200` `{ message }` |
-| `DELETE /chat/:chatId/message/:messageId` | Bearer JWT (Sender) | Path: `chatId, messageId` | `200` `{ message }` (soft delete) |
+### Messages
 
----
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/chat/:chatId/message/send` | Send a message |
+| `GET` | `/chat/:chatId/messages` | Retrieve messages |
+| `PATCH` | `/chat/:chatId/message/:messageId` | Edit a message |
+| `DELETE` | `/chat/:chatId/message/:messageId` | Soft-delete a message |
+| `POST` | `/chat/:chatId/message/:messageId/read` | Record a read receipt |
+| `POST` | `/chat/:chatId/lastseen` | Update last-seen state |
 
-## Setup & Scripts
+Additional request and response examples are available in [docs/api-reference.json](./docs/api-reference.json). The [Postman collection](./docs/chatflow.postman_collection.json) can be imported directly.
 
-### 1. Configure Environment
-Copy `.env.sample` to `.env` and configure:
-- `DATABASE_URL`: PostgreSQL / Neon pooler connection string (use `sslmode=verify-full` for Neon)
-- `JWT_SECRET`: Secret key (`>= 32` chars in production)
-- **Firebase credentials** (any one of):
-  - `FIREBASE_PROJECT_ID` + `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY` *(recommended for cloud deployment)*
-  - `FIREBASE_SERVICE_ACCOUNT_JSON` *(raw or base64 service account JSON)*
-  - `FIREBASE_SERVICE_ACCOUNT_PATH` *(local path e.g. `./creds.json`)*
-  - `FIRESTORE_EMULATOR_HOST` *(for local Firestore emulator)*
+## Local Setup
 
-### 2. Apply PostgreSQL Schema
-Run `database/schema.sql` against your PostgreSQL database, or push via Drizzle:
+### Prerequisites
+
+- Node.js 22.16 or newer
+- npm
+- PostgreSQL 14 or newer
+- A Firebase project with Firestore enabled, or the local Firestore emulator
+
+### 1. Install the project
+
+```bash
+git clone https://github.com/Upendrapal0607/chatflow-backend.git
+cd chatflow-backend
+npm install
+```
+
+If you already have the repository open, you can skip the clone and `cd` steps.
+
+### 2. Create the environment file
+
+On Windows:
+
+```bash
+copy .env.sample .env
+```
+
+On macOS or Linux:
+
+```bash
+cp .env.sample .env
+```
+
+Update `.env` before starting the server:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | Long random secret used to sign login tokens |
+| `JWT_EXPIRES_IN` | No | Token lifetime, for example `7d` |
+| `BCRYPT_SALT_ROUNDS` | No | Password hashing cost; the default is `12` |
+| `PORT` | No | HTTP port; defaults to `8000` |
+| `CORS_ORIGIN` | No | Allowed frontend origin; defaults to `*` |
+| `SKIP_DB_PREFLIGHT` | No | Set to `true` only when temporarily skipping startup connectivity checks |
+
+Example local PostgreSQL connection:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/chatflow
+JWT_SECRET=replace-with-a-random-secret-of-at-least-32-characters
+PORT=8000
+```
+
+### 3. Set up PostgreSQL
+
+Create an empty database, then apply the schema:
+
+```sql
+CREATE DATABASE chatflow;
+```
+
+Apply the schema with the provided SQL file:
+
+On PowerShell:
+
+```powershell
+psql $env:DATABASE_URL -f database/schema.sql
+```
+
+On macOS or Linux:
+
+```bash
+psql "$DATABASE_URL" -f database/schema.sql
+```
+
+For local PostgreSQL, you can provide the connection string directly:
+
+```bash
+psql "postgresql://postgres:postgres@localhost:5432/chatflow" -f database/schema.sql
+```
+
+Alternatively, push the Drizzle schema:
+
 ```bash
 npx drizzle-kit push
 ```
 
-### 3. Available Commands
-```bash
-npm install           # Install dependencies
-npm run dev           # Start development server (ts-node + dotenv)
-npm run dev:watch     # Start dev server with nodemon auto-reload
-npm run build         # Clean & compile TypeScript to build/
-npm start             # Run compiled production server (build/app.js)
-npm run type-check    # Run strict tsc --noEmit
-npm run lint:check    # Run ESLint with --max-warnings 0
-npm test              # Run Jest unit & endpoint tests
-npm run validate      # Run lint:check + type-check + test
+### 4. Configure Firestore
+
+Choose one of these options.
+
+**A. Firestore emulator**
+
+Start the emulator and set:
+
+```env
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 ```
 
-### 4. Production Deployment Notes
-- Set build command to `npm install && npm run build` and start command to `npm start`.
-- Set `NODE_ENV=production` and configure all `.env` variables in your hosting provider's environment settings (do not commit `.env` or `creds.json`).
-- Point your platform's health check probe to `GET /health/status`.
+**B. Service account file**
+
+Place the Firebase JSON file outside version control and set:
+
+```env
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+```
+
+**C. Inline service account values**
+
+```env
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@example.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Or set `FIREBASE_SERVICE_ACCOUNT_JSON` to the raw or base64-encoded service account JSON.
+
+Never commit `.env`, service account JSON files, or private keys.
+
+### 5. Start the server
+
+```bash
+npm run dev
+```
+
+The API will be available at `http://localhost:8000` by default. Verify it with:
+
+```bash
+curl http://localhost:8000/health/status
+```
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run dev:watch` | Start the server with file watching |
+| `npm run build` | Compile TypeScript into `build/` |
+| `npm start` | Run the compiled application |
+| `npm run type-check` | Run the TypeScript compiler without emitting files |
+| `npm run lint:check` | Run ESLint with warnings treated as errors |
+| `npm test` | Run the Jest test suite |
+| `npm run validate` | Run lint, type-checking, and tests |
+
+Before committing or deploying, run:
+
+```bash
+npm run validate
+```
+
+## Deployment
+
+Set `NODE_ENV=production` and provide `JWT_SECRET`, `DATABASE_URL`, and the selected Firebase credentials through the hosting environment. Do not commit `.env`, Firebase credential files, or private keys.
+
+A typical deployment uses:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+Use `GET /health/status` as the application health check.

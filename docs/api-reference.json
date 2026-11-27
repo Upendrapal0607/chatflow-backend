@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "baseUrl": "http://localhost:8000",
     "description": "Chat backend built with Node.js, strict TypeScript, Koa, PostgreSQL (Drizzle ORM + pg), and Firebase Firestore (firebase-admin).",
-    "scope": "Backend-only API service (no frontend required by the task).",
+    "scope": "====-only API service (no frontend required by the task).",
     "techStack": {
       "runtime": "Node.js >= 22.16.0",
       "language": "TypeScript (strict mode)",
